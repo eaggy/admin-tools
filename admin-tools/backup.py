@@ -8,12 +8,13 @@ import socket
 from setup_logger import logger
 
 config = configparser.ConfigParser()
-config.read('/home/backuper/settings.cfg')
+config.read('/home/backuper/backup_settings.cfg')
 
 BACKUP_PATHS = config['BACKUP']['LOCATION']
 
 DATABASE_MYSQL = config['DB_MYSQL']['DATABASE']
 DATABASE_POSTGRESQL = config['DB_POSTGRESQL']['DATABASE']
+PG_PASSWORD = config['DB_POSTGRESQL']['PASSWORD']
 
 SERVER = config['DESTINATION']['SERVER']
 LOCATION = config['DESTINATION']['LOCATION']
@@ -62,7 +63,7 @@ def backup_files(paths, user, server, location):
         logger.error(e)
 
 
-def dump_db(databases, db_type, user, server, location):
+def dump_db(databases, db_type, user, server, location, db_password=''):
     """
     Dump database and transfer data to remote server.
 
@@ -78,6 +79,8 @@ def dump_db(databases, db_type, user, server, location):
         IP of the remote server.
     location : str
         Path to the backup location on the remote server.
+    db_password : str, optional
+        Database password. The default is ''.
 
     Returns
     -------
@@ -97,11 +100,9 @@ def dump_db(databases, db_type, user, server, location):
                           .format(database, file_location))
             elif db_type.lower() == 'postgresql':
 
-                # change user
-                os.system('su - postgres')
                 # dump database
-                os.system('pg_dump -U postgres {}  | gzip > {}'
-                          .format(database, file_location))
+                os.system('PGPASSWORD={} pg_dump -Fc -U postgres {} > {}'
+                          .format(db_password, database, file_location))
             else:
                 return None
 
@@ -132,7 +133,8 @@ def main():
     if DATABASE_MYSQL:
         dump_db(DATABASE_MYSQL, 'MySQL', USER, SERVER, LOCATION)
     if DATABASE_POSTGRESQL:
-        dump_db(DATABASE_POSTGRESQL, 'PostgreSQL', USER, SERVER, LOCATION)
+        dump_db(DATABASE_POSTGRESQL, 'PostgreSQL', USER, SERVER, LOCATION,
+                PG_PASSWORD)
 
 
 if __name__ == '__main__':
